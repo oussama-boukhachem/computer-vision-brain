@@ -8,7 +8,9 @@ machine.
 **Status:** working prototype, used daily on my own desk. Not published as a
 package yet.
 
-![dashboard](docs/screenshot.png)
+![dashboard](docs/screenshot.jpg)
+
+![second view](docs/screenshot-2.jpg)
 
 ## What it does
 
