@@ -141,7 +141,6 @@ Planned, not implemented. Listed so the direction is clear, not to claim it work
 | `depth.py` | Metric depth, point cloud |
 | `setup.sh` | Environment setup |
 | `svc.sh` | Service control |
-| `HANDOFF.md` | Notes for whoever works on it next |
 | `docs/` | Architecture PDF and screenshots |
 
 ## Notes from building it
@@ -154,11 +153,16 @@ lives under systemd --user. Headless screenshots do not composite canvas content
 which makes a working 3D view look broken until you read the pixels back in the
 page.
 
-Those, and four more, are written down in `HANDOFF.md`.
+Also: the camera is exclusive, so a failed capture usually means another app
+holds the device, and MediaPipe 1.x dropped the old solutions API, so the tasks
+API is the only way in.
 
 ## Author
 
-Oussama Boukhachem — https://github.com/oussama-boukhachem
+Oussama Boukhachem
+
+- GitHub: https://github.com/oussama-boukhachem
+- Site: https://oussama.digital
 
 ## License
 
