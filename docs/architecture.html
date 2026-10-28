@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>cv-lab — Architecture and Code Reference</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin:0; color:#16202b; background:#fff;
+         font:10.5pt/1.5 "DejaVu Sans", "Liberation Sans", system-ui, sans-serif; }
+  h1 { font-size:21pt; margin:0 0 2mm; letter-spacing:-.01em; }
+  .sub { color:#55636f; font-size:11pt; margin:0 0 3mm; }
+  .meta { border-top:1px solid #d3dbe2; border-bottom:1px solid #d3dbe2;
+          padding:2mm 0; color:#55636f; font-size:9pt; margin-bottom:6mm;
+          display:flex; justify-content:space-between; }
+  h2 { font-size:12.5pt; margin:7mm 0 2.5mm; padding-bottom:1.5mm;
+       border-bottom:1px solid #e2e8ee; letter-spacing:.01em; }
+  h3 { font-size:10.5pt; margin:4mm 0 1.5mm; color:#2c3a47; }
+  p { margin:0 0 2.4mm; }
+  code { font-family:"DejaVu Sans Mono", monospace; font-size:9pt;
+         background:#f2f5f8; padding:.3mm 1.2mm; border-radius:2px; }
+  table { width:100%; border-collapse:collapse; margin:1.5mm 0 3mm; font-size:9pt; }
+  th { text-align:left; background:#f2f5f8; color:#33414f; font-weight:600;
+       padding:1.6mm 2mm; border-bottom:1px solid #d3dbe2; }
+  td { padding:1.5mm 2mm; border-bottom:1px solid #eaeff3; vertical-align:top; }
+  td.mono { font-family:"DejaVu Sans Mono", monospace; font-size:8.4pt; white-space:nowrap; }
+  .fig { margin:2mm 0 1mm; }
+  .cap { color:#66757f; font-size:8.5pt; margin:0 0 3mm; }
+  .legend { color:#55636f; font-size:8.6pt; display:flex; gap:7mm; margin-top:1mm; }
+  .legend span { display:inline-flex; align-items:center; gap:1.5mm; }
+  .sw { display:inline-block; width:11mm; height:0; border-top:2px solid #5f8f72; }
+  .sw.dash { border-top:2px dashed #7b8b99; }
+  .cmd { background:#f6f8fa; border:1px solid #e2e8ee; border-radius:3px;
+         padding:2.5mm 3mm; font-family:"DejaVu Sans Mono", monospace;
+         font-size:8.8pt; line-height:1.55; margin:1.5mm 0 3mm; white-space:pre; }
+  .note { border-left:2px solid #5f8f72; padding:1mm 0 1mm 3mm; color:#33414f;
+          background:#fafcfb; margin:2mm 0 3mm; font-size:9.4pt; }
+  ul { margin:0 0 2.5mm; padding-left:5mm; }
+  li { margin-bottom:1mm; }
+  .pb { page-break-before: always; }
+</style></head>
+<body>
+
+<h1>cv-lab</h1>
+<p class="sub">Local computer vision workspace — architecture and code reference</p>
+<div class="meta"><span>Oussama Boukhachem</span><span>28 October 2026 &middot; v1.0</span></div>
+
+<h2>1. What it is</h2>
+<p>A single local application that watches a webcam and explains what it sees. It
+runs on one laptop GPU, keeps every frame on the machine, and needs no cloud
+service or API key.</p>
+<p>Five capabilities share one frame pipeline: person detection and tracking, hand
+landmarks with held-gesture recognition, facial expression scoring, metric distance
+to any point, and a live 3D point cloud. A local vision-language model adds a
+short sentence about the scene. Everything is exposed on one web page at
+<code>127.0.0.1:8099</code>.</p>
+<p>The design goal is honesty about limits: distance is approximate, expression is
+not mood, and glass defeats monocular depth entirely. Those limits are documented
+in section 6 rather than hidden behind confident interface copy.</p>
+
+<h2>2. Architecture</h2>
+<div class="fig">
+<svg viewBox="0 0 960 500" width="100%" xmlns="http://www.w3.org/2000/svg"
+     font-family="DejaVu Sans, Liberation Sans, system-ui, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7b8b99"/>
+    </marker>
+    <marker id="arg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5f8f72"/>
+    </marker>
+  </defs>
+
+  <!-- camera -->
+  <rect x="20" y="120" width="120" height="80" rx="4" fill="#f2f5f8" stroke="#8fa3b5" stroke-width="1.2"/>
+  <text x="80" y="152" text-anchor="middle" font-size="12.5" fill="#16202b">Camera</text>
+  <text x="80" y="170" text-anchor="middle" font-size="10" fill="#55636f">/dev/video0</text>
+  <text x="80" y="187" text-anchor="middle" font-size="9" fill="#7b8b99">1280x720</text>
+
+  <!-- perception container -->
+  <rect x="180" y="86" width="170" height="192" rx="5" fill="none" stroke="#b9c6d2" stroke-dasharray="4 3"/>
+  <text x="265" y="104" text-anchor="middle" font-size="9" fill="#6b7a88" letter-spacing=".06em">PERCEPTION</text>
+  <rect x="192" y="112" width="146" height="46" rx="3" fill="#e9f2ec" stroke="#5f8f72" stroke-width="1.2"/>
+  <text x="265" y="132" text-anchor="middle" font-size="11" fill="#16202b">YOLO11n</text>
+  <text x="265" y="147" text-anchor="middle" font-size="8.6" fill="#55636f">detection + tracking</text>
+  <rect x="192" y="166" width="146" height="46" rx="3" fill="#e9f2ec" stroke="#5f8f72" stroke-width="1.2"/>
+  <text x="265" y="186" text-anchor="middle" font-size="11" fill="#16202b">Hand landmarks</text>
+  <text x="265" y="201" text-anchor="middle" font-size="8.6" fill="#55636f">21 points, hold timer</text>
+  <rect x="192" y="220" width="146" height="46" rx="3" fill="#e9f2ec" stroke="#5f8f72" stroke-width="1.2"/>
+  <text x="265" y="240" text-anchor="middle" font-size="11" fill="#16202b">Face blendshapes</text>
+  <text x="265" y="255" text-anchor="middle" font-size="8.6" fill="#55636f">52 coefficients</text>
+
+  <!-- compositor -->
+  <rect x="390" y="130" width="150" height="80" rx="4" fill="#f2f5f8" stroke="#8fa3b5" stroke-width="1.2"/>
+  <text x="465" y="160" text-anchor="middle" font-size="12" fill="#16202b">Frame compositor</text>
+  <text x="465" y="177" text-anchor="middle" font-size="9" fill="#55636f">boxes, skeleton, labels</text>
+  <text x="465" y="193" text-anchor="middle" font-size="9" fill="#7b8b99">JPEG quality 82</text>
+
+  <!-- http -->
+  <rect x="580" y="130" width="120" height="80" rx="4" fill="#f2f5f8" stroke="#8fa3b5" stroke-width="1.2"/>
+  <text x="640" y="158" text-anchor="middle" font-size="11.5" fill="#16202b">HTTP server</text>
+  <text x="640" y="175" text-anchor="middle" font-size="9" fill="#55636f">MJPEG + JSON</text>
+  <text x="640" y="191" text-anchor="middle" font-size="9" fill="#7b8b99">stdlib only</text>
+
+  <!-- browser -->
+  <rect x="740" y="130" width="150" height="80" rx="4" fill="#f2f5f8" stroke="#8fa3b5" stroke-width="1.2"/>
+  <text x="815" y="158" text-anchor="middle" font-size="11.5" fill="#16202b">Browser</text>
+  <text x="815" y="175" text-anchor="middle" font-size="9" fill="#55636f">video, feeds, toggles</text>
+  <text x="815" y="191" text-anchor="middle" font-size="9" fill="#7b8b99">canvas 3D viewer</text>
+
+  <!-- depth row -->
+  <rect x="580" y="280" width="150" height="64" rx="4" fill="#f2f5f8" stroke="#8fa3b5" stroke-width="1.2"/>
+  <text x="655" y="306" text-anchor="middle" font-size="11" fill="#16202b">Depth worker</text>
+  <text x="655" y="322" text-anchor="middle" font-size="8.8" fill="#55636f">on demand, ~300 ms</text>
+  <rect x="770" y="280" width="170" height="64" rx="4" fill="#e9f2ec" stroke="#5f8f72" stroke-width="1.2"/>
+  <text x="855" y="306" text-anchor="middle" font-size="11" fill="#16202b">Depth Anything V2</text>
+  <text x="855" y="322" text-anchor="middle" font-size="8.8" fill="#55636f">metric indoor, metres</text>
+  <text x="770" y="362" font-size="8.4" fill="#66757f">/measure &middot; /depthmap &middot; /pointcloud</text>
+
+  <!-- narration row -->
+  <rect x="580" y="396" width="150" height="60" rx="4" fill="#f2f5f8" stroke="#8fa3b5" stroke-width="1.2"/>
+  <text x="655" y="420" text-anchor="middle" font-size="11" fill="#16202b">Narration</text>
+  <text x="655" y="436" text-anchor="middle" font-size="8.8" fill="#55636f">motion gated</text>
+  <rect x="770" y="396" width="170" height="60" rx="4" fill="#e9f2ec" stroke="#5f8f72" stroke-width="1.2"/>
+  <text x="855" y="420" text-anchor="middle" font-size="11" fill="#16202b">qwen2.5vl:3b</text>
+  <text x="855" y="436" text-anchor="middle" font-size="8.8" fill="#55636f">local, via Ollama</text>
+  <text x="770" y="474" font-size="8.4" fill="#66757f">text feed in the dashboard</text>
+
+  <!-- arrows -->
+  <line x1="140" y1="160" x2="178" y2="160" stroke="#7b8b99" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="350" y1="160" x2="388" y2="160" stroke="#7b8b99" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="540" y1="163" x2="578" y2="163" stroke="#7b8b99" stroke-width="1.4" marker-end="url(#ar)"/>
+  <line x1="700" y1="163" x2="738" y2="163" stroke="#7b8b99" stroke-width="1.4" marker-end="url(#ar)"/>
+
+  <!-- clean frame trunk -->
+  <path d="M465,210 V312 H578" fill="none" stroke="#7b8b99" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <path d="M465,312 V426 H578" fill="none" stroke="#7b8b99" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text x="472" y="252" font-size="8.6" fill="#6b7a88">clean frame, no overlays</text>
+
+  <line x1="730" y1="312" x2="768" y2="312" stroke="#5f8f72" stroke-width="1.4" marker-end="url(#arg)"/>
+  <line x1="730" y1="426" x2="768" y2="426" stroke="#5f8f72" stroke-width="1.4" marker-end="url(#arg)"/>
+</svg>
+</div>
+<div class="legend">
+  <span><i class="sw"></i> every frame</span>
+  <span><i class="sw dash"></i> on demand / when enabled</span>
+  <span>green boxes: models</span>
+</div>
+<p class="cap">Figure 1. One capture thread feeds all models. Depth and narration read the
+same overlay-free frame, and only run when enabled.</p>
+
+<h2>3. Modules and functions</h2>
+
+<h3>webui.py — server, capture loop, workers, page</h3>
+<table>
+<tr><th style="width:34%">Function</th><th>Responsibility</th></tr>
+<tr><td class="mono">_make_stop_frame()</td><td>Renders the placeholder shown while the camera is stopped.</td></tr>
+<tr><td class="mono">describe()</td><td>Posts one JPEG to Ollama and returns the sentence plus latency.</td></tr>
+<tr><td class="mono">add_event()</td><td>Pushes a narration line into the shared feed.</td></tr>
+<tr><td class="mono">add_gesture()</td><td>Records a gesture that completed its hold.</td></tr>
+<tr><td class="mono">vision_loop()</td><td>Owns the camera. Reads frames, tracks, runs hands and face, draws, encodes, publishes. Handles stop/start and camera release.</td></tr>
+<tr><td class="mono">depth_loop()</td><td>Runs only while a depth feature is on. Produces the metre map and heatmap, throttled to a few updates per second.</td></tr>
+<tr><td class="mono">vlm_loop()</td><td>Watches for pixel change, then asks the model for a sentence. Yields whenever depth is active.</td></tr>
+<tr><td class="mono">Handler._send()</td><td>Writes a full response with the headers the UI depends on.</td></tr>
+<tr><td class="mono">Handler.do_POST()</td><td>Feature toggles and start/stop.</td></tr>
+<tr><td class="mono">Handler.do_GET()</td><td>Routes page, stream, snapshot, events, depth, cloud, measure.</td></tr>
+<tr><td class="mono">Handler.log_message()</td><td>Silences per-request logging.</td></tr>
+<tr><td class="mono">main()</td><td>Parses options, starts the three workers, serves until interrupted.</td></tr>
+</table>
+
+<h3>gesture.py — hands and held gestures</h3>
+<table>
+<tr><th style="width:34%">Function</th><th>Responsibility</th></tr>
+<tr><td class="mono">HandTracker.__init__()</td><td>Loads the MediaPipe hand model and sets the hold duration.</td></tr>
+<tr><td class="mono">HandTracker.detect()</td><td>Returns hands with 21 landmarks, finger states, gesture name and hold progress.</td></tr>
+<tr><td class="mono">HandTracker.reset()</td><td>Clears hold state when the camera stops, so nothing fires stale.</td></tr>
+<tr><td class="mono">HeldGesture.update()</td><td>Accumulates how long the same gesture has persisted; returns a fire event once.</td></tr>
+<tr><td class="mono">_straightness()</td><td>Chord over segment length for one finger chain: near 1 is extended, low is curled.</td></tr>
+<tr><td class="mono">_name_from_fingers()</td><td>Maps the set of extended fingers to a gesture name.</td></tr>
+<tr><td class="mono">draw_hands()</td><td>Draws skeleton, dots, label and the hold progress bar.</td></tr>
+</table>
+
+<h3>emotion.py — facial expression</h3>
+<table>
+<tr><th style="width:34%">Function</th><th>Responsibility</th></tr>
+<tr><td class="mono">EmotionEngine.__init__()</td><td>Loads the face model with blendshape output enabled.</td></tr>
+<tr><td class="mono">EmotionEngine.detect()</td><td>Returns dominant expression, all scores, and the face box in pixels.</td></tr>
+<tr><td class="mono">EmotionEngine._scores()</td><td>Converts 52 coefficients into six normalised scores, with a neutral floor so weak signals do not read as anger.</td></tr>
+</table>
+
+<h3>depth.py — metric depth</h3>
+<table>
+<tr><th style="width:34%">Function</th><th>Responsibility</th></tr>
+<tr><td class="mono">DepthEngine.__init__()</td><td>Loads the metric model onto the GPU.</td></tr>
+<tr><td class="mono">DepthEngine.estimate()</td><td>Returns a float map in metres at frame resolution.</td></tr>
+<tr><td class="mono">DepthEngine.distance_at()</td><td>Median of a small window, so a click does not jitter on one noisy pixel.</td></tr>
+<tr><td class="mono">DepthEngine.colourise()</td><td>Turbo heatmap clipped to 0.5–8 m.</td></tr>
+<tr><td class="mono">DepthEngine.pointcloud()</td><td>Back-projects the depth grid with 60-degree intrinsics into x,y,z,r,g,b.</td></tr>
+</table>
+
+<h2 class="pb">4. HTTP interface</h2>
+<table>
+<tr><th style="width:30%">Endpoint</th><th>Returns</th></tr>
+<tr><td class="mono">GET /</td><td>Dashboard page.</td></tr>
+<tr><td class="mono">GET /stream</td><td>MJPEG stream of the annotated frame.</td></tr>
+<tr><td class="mono">GET /snapshot</td><td>One annotated JPEG, or the stopped placeholder.</td></tr>
+<tr><td class="mono">GET /events</td><td>Stats, both feeds, gesture state, expression, objects, feature flags.</td></tr>
+<tr><td class="mono">GET /measure?x=&amp;y=</td><td>Distance in metres at normalised coordinates.</td></tr>
+<tr><td class="mono">GET /depthmap</td><td>Depth heatmap JPEG.</td></tr>
+<tr><td class="mono">GET /pointcloud</td><td>Binary float32 cloud, six values per point.</td></tr>
+<tr><td class="mono">POST /api/toggle</td><td>Enable or disable depth, cloud, emotion, objects.</td></tr>
+<tr><td class="mono">POST /api/run</td><td>Start or stop capture. Stop releases the device.</td></tr>
+</table>
+
+<h2>5. Measured performance</h2>
+<table>
+<tr><th style="width:46%">Stage</th><th>Cost on the RTX 4060 laptop</th></tr>
+<tr><td>Person detection and tracking</td><td>5–6 ms per frame</td></tr>
+<tr><td>Hand landmarks, 0.6 scale, every other frame</td><td>10–15 ms</td></tr>
+<tr><td>Expression scoring</td><td>~10 ms, CPU only</td></tr>
+<tr><td>Metric depth</td><td>~300 ms per pass</td></tr>
+<tr><td>Scene narration</td><td>1.6–1.9 s warm</td></tr>
+<tr><td>End to end, hands enabled</td><td>~40 fps</td></tr>
+<tr><td>End to end, tracking only</td><td>~60 fps</td></tr>
+</table>
+<p>Memory: about 1.4 GB of VRAM for the depth model, shared with a 2.9 GB local
+vision model that the system loads only when narration is used.</p>
+
+<h2>6. Known limits</h2>
+<ul>
+<li><b>Glass.</b> Monocular depth has no cue for a transparent pane. It reports the
+surface behind it, or invents one. Wall and furniture distances are usable; window
+distances are not.</li>
+<li><b>Expression is not mood.</b> The classifier reads the face. Glasses, beards,
+side lighting and laptop cameras all reduce accuracy.</li>
+<li><b>3D view is a sketch.</b> There is no loop closure and no drift correction.
+Geometry wobbles as depth is re-estimated. Accurate mapping needs a depth sensor and
+a SLAM stack.</li>
+<li><b>Class, not instance.</b> The detector reports categories from the 80-class
+COCO set. Recognising your own objects requires training a model on your data.</li>
+<li><b>One camera at a time.</b> The device is exclusive by design.</li>
+</ul>
+
+<h2>7. Running it</h2>
+<div class="cmd">bash setup.sh          # venv, torch, ultralytics, opencv (once)
+./svc.sh start        # or: python webui.py --port 8099
+./svc.sh status
+./svc.sh stop</div>
+<p>Open <code>http://127.0.0.1:8099</code>. Start and Stop in the header control
+capture; Stop releases the camera so other software can use it. Toggles add
+distance, a 3D point cloud, expression and full object detection.</p>
+
+<div class="note">Training your own detector needs 20–50 labelled frames per class
+and runs on the same GPU: <code>yolo train model=yolo11n.pt data=data.yaml
+epochs=100 imgsz=640 batch=8</code>.</div>
+
+</body></html>

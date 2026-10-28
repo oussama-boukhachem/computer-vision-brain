@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+frames/
+logs/
+*.log
+.webui.pid
+models/*.task
+yolo11n.pt
